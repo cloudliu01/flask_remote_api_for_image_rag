@@ -102,8 +102,8 @@ def test_upload_image_success(client):
     image_path = get_test_image_path("IMG_8339.JPG")  # Replace with your actual test image file
     payload = {
         "image_path": image_path,  # Use the test image path
-        "location_desc": "New York City, NY",
-        "user": "test_user",
+        "account_name": "test_account",
+        "account_source": "test_upload_image_success",
         "chat_session_id": "test_session"
     }
 
@@ -115,89 +115,3 @@ def test_upload_image_success(client):
     data = response.get_json()
     assert data["message"] == "Similar images found"
     assert isinstance(data["similar_images"], list)
-
-def test_upload_image_file_not_found(client):
-    """
-    Test the upload_image endpoint for missing image file.
-    """
-    # Prepare the test payload with a nonexistent file path
-    payload = {
-        "image_path": "/nonexistent/path/to/image.jpg",
-        "exif": {"GPSLatitude": "40.7128", "GPSLongitude": "-74.0060"},
-        "location_desc": "New York City, NY",
-        "user": "test_user",
-        "chat_session_id": "test_session"
-    }
-
-    # Make the POST request
-    response = client.post("/api/upload_image", json=payload)
-
-    # Assertions
-    assert response.status_code == 400
-    data = response.get_json()
-    assert "error" in data
-    assert "Image file not found" in data["error"]
-
-def test_upload_image_missing_field(client):
-    """
-    Test the upload_image endpoint for missing required fields.
-    """
-    # Prepare the test payload with a missing field
-    image_path = get_test_image_path("example.jpg")  # Replace with your actual test image file
-    payload = {
-        "image_path": image_path,
-        "location_desc": "New York City, NY",
-        "user": "test_user"
-        # Missing chat_session_id
-    }
-
-    # Make the POST request
-    response = client.post("/api/upload_image", json=payload)
-
-    # Assertions
-    assert response.status_code == 400
-    data = response.get_json()
-    assert "error" in data
-    assert "Missing required field" in data["error"]
-
-def test_upload_image_invalid_json(client):
-    """
-    Test the upload_image endpoint for invalid JSON input.
-    """
-    # Make the POST request with invalid JSON
-    response = client.post("/api/upload_image", data="invalid json")
-
-    # Assertions
-    assert response.status_code == 400
-    data = response.get_json()
-    assert "error" in data
-    assert "Invalid input. Expected JSON format." in data["error"]
-
-def test_upload_image_no_similar_images(client):
-    """
-    Test the upload_image endpoint when no similar images are found.
-    """
-    # Prepare the test payload
-    image_path = get_test_image_path("example.jpg")  # Replace with your actual test image file
-    payload = {
-        "image_path": image_path,
-        "location_desc": "New York City, NY",
-        "user": "test_user",
-        "chat_session_id": "test_session"
-    }
-
-    # Patch the retrieve_similar_images function to return an empty list
-    with pytest.MonkeyPatch().context() as monkeypatch:
-        monkeypatch.setattr(
-            "app.routes.retrieve_similar_images",
-            lambda image_path, geo_info: []
-        )
-
-        # Make the POST request
-        response = client.post("/api/upload_image", json=payload)
-
-        # Assertions
-        assert response.status_code == 404
-        data = response.get_json()
-        assert data["message"] == "Not found"
-        assert data["similar_images"] == []

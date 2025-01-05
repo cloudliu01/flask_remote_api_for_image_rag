@@ -1,14 +1,17 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from pydantic import ValidationError
 from typing import Dict, Any, List
 
+from app import app
 from app.models_base import ImageEntry
-from app.common import extract_image_metadata
+from app.utilities.image import extract_image_metadata
+from app.utilities.llm import get_embedding
+from app.utilities.db_common import image_data_to_db
+from app.utilities.common import write_embedding_to_file, load_embedding_from_file
 
 api_bp = Blueprint("api", __name__)
 
-def register_routes(app):
-    app.register_blueprint(api_bp)
+
 @api_bp.route("/api/health", methods=["GET"])
 def health_check():
     return jsonify({"status": "OK", "message": "API is running"}), 200
@@ -62,8 +65,8 @@ def upload_image():
     Expects a JSON payload:
     {
         "image_path": "path/to/image.jpg",
-        "location_desc": "location description",
-        "user": "user_id",
+        "account_name": "account_name",
+        "account_source": "account_source",
         "chat_session_id": "session_id"
     }
     """
@@ -74,23 +77,39 @@ def upload_image():
     data = request.get_json()
 
     # Validate required fields
-    required_fields = ["image_path", "location_desc", "user", "chat_session_id"]
+    required_fields = ["image_path", "account_name", "account_source",  "chat_session_id"]
     for field in required_fields:
         if field not in data:
             return jsonify({"error": f"Missing required field: {field}"}), 400
 
     image_path = data["image_path"]
-    location_desc = data["location_desc"]
-    user = data["user"]
+    account_name = data["account_name"]
+    account_source = data["account_source"]
     chat_session_id = data["chat_session_id"]
+
+    db_session = current_app.extensions["sqlalchemy"].session
 
     # Step 1: Extract accurate geo information from EXIF data
     image_metadata = extract_image_metadata(image_path)
-    if image_metadata and image_metadata.get("WKT Point"):
-        accurate_geo_exif = image_metadata["WKT Point"]
+    if image_metadata:
+        if image_metadata.get("WKT Point"):
+            accurate_geo_exif = image_metadata["WKT Point"]
+    
+    image_embedding = get_embedding(image_path, mode="image")
+    #image_embedding = load_embedding_from_file('./test_embedding.txt')
 
+    #sample_text = "This is a sample text for testing."
+    #text_embedding = get_embedding(image_path, mode="text")
+
+    # Step 2: Store the image and its metadata into the database
+    image_data_to_db( db_session=db_session, image_path=image_path,
+        image_metadata=image_metadata, image_embedding=image_embedding, account_name=account_name, 
+        account_source=account_source, session_id=chat_session_id) 
+    print('Image data stored in the database')
+    
+def aaaa():
     # Step 2: Retrieve previous accurate and rough geo info from the database
-    previous_geo_info = get_previous_geo_from_db(chat_session_id, user)
+    previous_geo_info = get_previous_geo_from_db(chat_session_id, account_name)
 
     # Step 3: Extract accurate and rough geo info from location description
     geo_from_location_desc = get_geo_from_location_desc(location_desc)
