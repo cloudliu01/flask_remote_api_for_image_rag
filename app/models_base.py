@@ -4,11 +4,11 @@ import os
 from typing import List
 
 class ImageEntry(BaseModel):
-    file_path: str
+    dir_path: str
     user: str = Field(..., min_length=1)
     session: str = Field(..., min_length=1)
 
-    @validator('URL')
+    @validator('dir_path')
     def validate_path_exists(cls, v):
         """Validator to ensure the path exists."""
         if not os.path.exists(v):

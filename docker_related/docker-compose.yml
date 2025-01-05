@@ -1,0 +1,51 @@
+version: '3.5'
+
+services:
+  postgres:
+    container_name: postgres_pgvector_postgis
+    build:
+      context: .  
+      dockerfile: Dockerfile.pgvector.postgis  
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lic-test_2024}
+      PGDATA: /data/postgres
+    volumes:
+      - ./local_postgres_data:/data/postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - postgres
+    restart: unless-stopped
+
+  pgadmin:
+    container_name: pgadmin_pgvector_postgis
+    image: dpage/pgadmin4:8.6
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.org}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    #volumes:
+    #   - pgadmin:/var/lib/pgadmin
+    volumes:
+      - ./local_pgadmin_data:/var/lib/pgadmin 
+    
+
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    networks:
+      - postgres
+    restart: unless-stopped
+
+networks:
+  postgres:
+    driver: bridge
+
+#volumes:
+#    postgres:
+#    pgadmin:
+volumes:
+  postgres:
+    driver: local
+  pgadmin:
+    driver: local
