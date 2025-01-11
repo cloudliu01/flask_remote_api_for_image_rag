@@ -1,6 +1,9 @@
 import pprint
 import io
+import os
+import hashlib
 import piexif
+import base64
 from typing import Optional, Tuple, Dict, Union
 from PIL import Image, ExifTags
 from timezonefinder import TimezoneFinder
@@ -146,6 +149,43 @@ def convert_to_postgis_point(latitude: Optional[float], longitude: Optional[floa
     return f"POINT({longitude} {latitude})"
 
 
+def convert_to_wkt(location_info: dict) -> str:
+    """
+    Converts location information to WKT format.
+    
+    :param location_info: A dictionary with 'latitude', 'longitude', and optionally 'altitude'.
+                          Example: {"latitude": 40.785091, "longitude": -73.968285, "altitude": 30.5}
+    :return: A WKT POINT or POINTZ string.
+    :raises ValueError: If latitude or longitude is missing or invalid.
+    """
+    try:
+        latitude = location_info.get("latitude")
+        longitude = location_info.get("longitude")
+        altitude = location_info.get("altitude")
+
+        if latitude is None or longitude is None:
+            raise ValueError("Latitude and longitude are required for WKT conversion.")
+
+        # Validate that latitude and longitude are floats
+        latitude = float(latitude)
+        longitude = float(longitude)
+
+        # Ensure valid latitude/longitude ranges
+        if not (-90 <= latitude <= 90):
+            raise ValueError(f"Invalid latitude value: {latitude}. Must be between -90 and 90.")
+        if not (-180 <= longitude <= 180):
+            raise ValueError(f"Invalid longitude value: {longitude}. Must be between -180 and 180.")
+
+        # Construct POINT or POINTZ based on altitude availability
+        if altitude is not None:
+            altitude = float(altitude)
+            return f"POINTZ({longitude} {latitude} {altitude})"
+        return f"POINT({longitude} {latitude})"
+
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Error converting location to WKT: {e}")
+
+
 def get_decimal_coordinates(gps_info: Dict) -> Tuple[Optional[float], Optional[float]]:
     """
     Converts GPSInfo to decimal coordinates.
@@ -231,23 +271,24 @@ def get_orientation(gps_info: Dict) -> Optional[float]:
     return orientation
 
 
-def extract_image_metadata(image_input: Union[str, bytes]) -> Dict[str, Optional[str]]:
+def extract_image_metadata(image_input: Union[str, io.BytesIO]) -> Dict[str, Optional[str]]:
     """
     Extracts metadata from an image file or binary image data, including location, focal length, orientation,
     altitude, device details, and capture datetime. GPSInfo is formatted for PostGIS.
 
-    :param image_input: Path to the image file or binary image data (bytes).
+    :param image_input: Path to the image file or binary image data (io.BytesIO).
     :return: A dictionary with extracted metadata.
     """
     try:
         # Open the image (handle both file path and binary data)
-        if isinstance(image_input, str):
+        if isinstance(image_input, str) and os.path.exists(image_input):
             image = Image.open(image_input)
-        elif isinstance(image_input, bytes):
-            image = Image.open(io.BytesIO(image_input))
+        elif isinstance(image_input, io.BytesIO):
+            image = Image.open(image_input)
         else:
             return {"Error": "Unsupported input type. Provide a file path or binary data."}
 
+        #image.show()
         # Extract EXIF data
         exif = image._getexif()
         if not exif:
@@ -293,3 +334,57 @@ def extract_image_metadata(image_input: Union[str, bytes]) -> Dict[str, Optional
 
     except Exception as e:
         return {"Error": str(e)}
+
+
+def image_to_base64(filepath, keep_exif=True):
+    """Converts an image to base64 string."""
+    if keep_exif:   
+        with open(filepath, "rb") as image:
+            return base64.b64encode(image.read()).decode('utf-8')
+    else:
+        with Image.open(filepath) as image:
+            buffer = io.BytesIO()
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            image.save(buffer, format='JPEG')
+            return base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+def base64_to_image(base64_string):
+    """Converts a base64-encoded string back to an image and displays it."""
+    image_bytes = base64.b64decode(base64_string)
+    image_data = io.BytesIO(image_bytes)
+    #image = Image.open(image_data)
+    #image.show()
+    return image_data
+
+
+
+def get_md5_of_image(input_data):
+    """
+    Computes the MD5 hash of an image given directly as bytes, from a file path, or from a base64-encoded string.
+
+    :param input_data: Either the bytes of the image, a string path to an image file, or a base64-encoded string.
+    :return: The hexadecimal MD5 hash of the image.
+    """
+    hash_md5 = hashlib.md5()
+    
+    if isinstance(input_data, bytes):
+        # If input is bytes, directly update MD5 hash
+        hash_md5.update(input_data)
+    elif isinstance(input_data, str):
+        if os.path.isfile(input_data):
+            # If input is a file path, open the file and update MD5 hash
+            with open(input_data, "rb") as file:
+                for chunk in iter(lambda: file.read(4096), b""):
+                    hash_md5.update(chunk)
+        else:
+            # Assume input is a base64 string, decode and update MD5 hash
+            try:
+                image_bytes = base64.b64decode(input_data)
+                hash_md5.update(image_bytes)
+            except base64.binascii.Error:
+                raise ValueError("Input string is neither a valid file path nor a valid base64 string")
+    else:
+        raise ValueError("Input must be either image bytes, a valid file path to an image, or a base64-encoded string")
+
+    return hash_md5.hexdigest()

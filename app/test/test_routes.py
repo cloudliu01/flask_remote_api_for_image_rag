@@ -1,5 +1,8 @@
 import pytest
 import os
+from unittest.mock import patch, MagicMock
+
+from app.utilities.image import image_to_base64
 from app.app import create_app
 
 IMAGE_DIR = os.path.join(os.path.dirname(__file__), 'images')
@@ -115,3 +118,111 @@ def test_upload_image_success(client):
     data = response.get_json()
     assert data["message"] == "Similar images found"
     assert isinstance(data["similar_images"], list)
+
+
+#@patch("app.routes.get_chat_histories_from_db")  # Mock database function
+#def test_process_chat_valid_input(mock_get_chat_histories, client):
+def test_process_chat_valid_input(client):
+    """
+    Test process_chat with valid inputs.
+    """
+    # Mock response for get_chat_histories_from_db
+    mock_chat_history = MagicMock()
+    mock_chat_history.location = "POINT(-73.985428 40.748817)"  # Mock a valid location
+    #mock_get_chat_histories.return_value = [mock_chat_history]
+
+    # Input data
+    payload = {
+        "account_id": "test_account",
+        "content": "Find images near Empire State Building.",
+        "session_id": "test_session",
+        "back_hours": 0
+    }
+
+    # Call the API
+    response = client.post("/process_chat", json=payload)
+
+    # Assertions
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "error" not in data  # Ensure no error is returned
+    assert "images" in data  # Ensure images are included in the response
+    #mock_get_chat_histories.assert_called_once_with("abc123", 1, 2)  # Ensure function is called with correct params
+
+
+def test_valid_json_with_image_1(client):
+    """ Test the route with valid JSON including base64 image data """
+    image_path = get_test_image_path("IMG_0643.JPG")  # Replace with your actual test image file
+    image_base64 = image_to_base64(image_path)
+    data = {
+        "model": "gpt-4o-mini",
+        "user": "671756edd40f99d73854437a",
+        "session": "1234567abcd",
+        "stream": True,
+        "messages": [
+            {"role": "system", "content": "你是一个资深导游"}, 
+            {"role": "user", "content": "你好！"}, 
+            {"role": "assistant", "content": "你好！有什么我可以帮助你的吗？"}, 
+            {"role": "user", "content": [
+                {
+                    "type": "text", 
+                    "content": "我想看看这张照片附近的景点"
+                },
+                {
+                    "type": "image_url", 
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{image_base64}", 
+                        "detail": "auto"
+                    }
+                }
+            ]},
+        ],
+        "max_tokens": 4000
+    }
+    response = client.post('/process_chat_json', json=data)
+    assert response.status_code == 200
+    assert response.json['message'] == 'JSON data is valid'
+
+
+def test_valid_json_with_image_2(client):
+    """ Test the route with valid JSON including base64 image data. The image doesn't have exif data """
+    image_path = get_test_image_path("IMG_1181.JPG")  
+    image_base64 = image_to_base64(image_path, keep_exif=False)
+    data = {
+        "model": "gpt-4o-mini",
+        "user": "671756edd40f99d73854437a",
+        "session": "1234567abcd",
+        "stream": True,
+        "messages": [
+            {"role": "system", "content": "你是一个资深导游"}, 
+            {"role": "user", "content": "你好！"}, 
+            {"role": "assistant", "content": "你好！有什么我可以帮助你的吗？"}, 
+            {"role": "user", "content": [
+                {
+                    "type": "text", 
+                    "content": "我想看看这张照片附近的景点"
+                },
+                {
+                    "type": "image_url", 
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{image_base64}", 
+                        "detail": "auto"
+                    }
+                }
+            ]},
+            {"role": "assistant", "content": "图片好像没有地理信息。请发送一个你的位置信息。"}, 
+            {"role": "user", 
+                "content": {
+                    "type": "location",
+                    "location": {
+                        "longitude":    -73.985428, 
+                        "latitude":     40.748817
+                    }
+                }
+            } 
+        ],
+        "max_tokens": 4000
+    }
+    response = client.post('/process_chat_json', json=data)
+    assert response.status_code == 200
+    assert response.json['message'] == 'JSON data is valid'

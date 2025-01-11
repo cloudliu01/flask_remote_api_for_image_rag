@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2025-01-05T10:48:22.092Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" etag="-cd2Z0BCdPZRB2yGYJM3" version="23.1.5" type="device">
+<mxfile host="app.diagrams.net" modified="2025-01-07T20:36:16.173Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" etag="x90fY3i7-MVlmFC0AW_a" version="23.1.5" type="device">
   <diagram id="C5RBs43oDa-KdzZeNtuy" name="Page-1">
     <mxGraphModel dx="1285" dy="696" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
       <root>
@@ -88,6 +88,12 @@
         </mxCell>
         <mxCell id="YeWFxfJ98W7xI_AburcW-70" value="Synthesize the determined location&lt;br&gt;priority: accurate geo inf from exif &amp;gt; accurate geo info from location_desc &amp;gt; rough geo info from location_desc &amp;gt; accurate geo info from chat_session_id &amp;amp; user &amp;gt; rough geo info from chat_session_id &amp;amp; user" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="WIyWlLk6GJQsqaUBKTNV-1">
           <mxGeometry x="190" y="360" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="YeWFxfJ98W7xI_AburcW-81" value="(location, session_id)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="WIyWlLk6GJQsqaUBKTNV-1">
+          <mxGeometry x="958" y="453" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="YeWFxfJ98W7xI_AburcW-82" value="(prompt, session_id)" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="WIyWlLk6GJQsqaUBKTNV-1">
+          <mxGeometry x="776" y="453" width="120" height="60" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

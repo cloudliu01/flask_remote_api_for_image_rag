@@ -3,3 +3,5 @@ app/__pycache__*
 *.cpython-*.pyc
 docker_related/local_pgadmin_data/*
 docker_related/local_postgres_data/*
+.DS_Store
+app/test/images/*

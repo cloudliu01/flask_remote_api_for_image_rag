@@ -25,7 +25,7 @@ class Account(db.Model):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     source = Column(String, nullable=False)
-    create_time = Column(TIMESTAMP, nullable=False)
+    create_time = Column(TIMESTAMP(timezone=True), nullable=False)
 
     images = relationship('Image', back_populates='creator')  # Plural for many-to-one
     chat_histories = relationship('ChatHistory', back_populates='account')  # Plural for many-to-one
@@ -64,7 +64,7 @@ class ChatSession(db.Model):
     __tablename__ = 'chat_session'
     id = Column(BigInteger, primary_key=True)
     session_id = Column(String, nullable=False)
-    create_time = Column(TIMESTAMP, nullable=False)
+    create_time = Column(TIMESTAMP(timezone=True), nullable=True)
 
     chat_histories = relationship('ChatHistory', back_populates='session')  # Plural for one-to-many
 
@@ -72,9 +72,10 @@ class ChatSession(db.Model):
 class Image(db.Model):
     __tablename__ = 'image'
     id = Column(BigInteger, primary_key=True)
-    path = Column(String, nullable=False)
+    path = Column(String, nullable=True)
+    md5 = Column(String, nullable=False)
     creator_id = Column(Integer, ForeignKey('account.id'), nullable=False)
-    device_id = Column(Integer, ForeignKey('device.id'), nullable=False)
+    device_id = Column(Integer, ForeignKey('device.id'), nullable=True)
     location = Column(Geography('POINT', srid=4326), nullable=True)
     taken_time = Column(TIMESTAMP(timezone=True), nullable=True)
     focus_35mm = Column(Integer, nullable=True)
@@ -93,8 +94,10 @@ class ChatHistory(db.Model):
     session_id = Column(BigInteger, ForeignKey('chat_session.id'), nullable=False)
     account_id = Column(Integer, ForeignKey('account.id'), nullable=False)
     image_id = Column(BigInteger, ForeignKey('image.id'), nullable=True)
-    time = Column(TIMESTAMP, nullable=False)
-    content = Column(String, nullable=True)
+    time = Column(TIMESTAMP(timezone=True), nullable=False)
+    location = Column(Geography('POINT', srid=4326), nullable=True)
+    prompt = Column(JSON, nullable=False)
+    llm_reply = Column(String, nullable=True)
 
     session = relationship('ChatSession', back_populates='chat_histories')  # Plural for one-to-many
     account = relationship('Account', back_populates='chat_histories')  # Plural for one-to-many
