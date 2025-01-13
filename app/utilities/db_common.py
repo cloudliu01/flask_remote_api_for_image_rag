@@ -33,7 +33,7 @@ def device_to_db(db_session, image_metadata):
             db_session.commit()
     return device
 
-def image_to_db(db_session, image_path, image_metadata, image_md5, image_embedding, account, device):
+def image_to_db(db_session, image_path, image_metadata, image_md5, image_embedding, account_id, device_id):
     if image_metadata.get("Datetime Taken") and image_metadata.get("Timezone"):
         taken_time = convert_datetime_with_timezone(image_metadata.get("Datetime Taken"), image_metadata.get("Timezone"))
     else:
@@ -43,8 +43,8 @@ def image_to_db(db_session, image_path, image_metadata, image_md5, image_embeddi
         image = Image(
             path=image_path,
             md5=image_md5,
-            creator_id=account.id,
-            device_id=device.id if device else None,
+            creator_id=account_id,
+            device_id=device_id,
             location=image_metadata.get("WKT Point"),
             taken_time=taken_time,
             focus_35mm=image_metadata.get("Focal Length (35mm)"),

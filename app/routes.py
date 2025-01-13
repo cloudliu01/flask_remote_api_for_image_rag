@@ -14,7 +14,7 @@ from app.utilities.llm import get_embedding
 from app.utilities.db_common import account_to_db, device_to_db, image_to_db, chat_session_to_db, chat_history_to_db, \
     search_images, get_chat_histories_from_db
 from app.utilities.common import write_embedding_to_file, load_embedding_from_file, TZ
-from app.models_base import ChatJsonSchema
+from app.models_base import ChatJsonSchema, ImageUploadJsonSchema
 
 from datetime import timezone
 api_bp = Blueprint("api", __name__)
@@ -24,172 +24,6 @@ api_bp = Blueprint("api", __name__)
 def health_check():
     return jsonify({"status": "OK", "message": "API is running"}), 200
 
-@api_bp.route("/api/data", methods=["POST"])
-def handle_data():
-    if not (data := request.json):
-        return jsonify({"error": "No data provided"}), 400
-    else:
-        # Example: Process the data
-        return jsonify({"message": "Data received", "data": data}), 200
-
-
-# @api_bp.route("/api/upload_images", methods=["POST"])
-# def upload_images():
-#     """Endpoint to upload a list of images with metadata."""
-#     if not request.is_json:
-#         return jsonify({"error": "Request must be in JSON format"}), 400
-# 
-#     data = request.json
-#     if not isinstance(data, list):
-#         return jsonify({"error": "Request body must be a list of image objects"}), 400
-# 
-#     # Validate and parse each image entry
-#     images = []
-#     errors = []
-#     for idx, entry in enumerate(data):
-#         try:
-#             image_entry = ImageEntry(**entry)
-#             images.append(image_entry.dict())
-#         except ValidationError as e:
-#             errors.append({"index": idx, "error": e.errors()})
-# 
-#     # If any validation errors, return them
-#     if errors:
-#         return jsonify({"message": "Validation failed", "errors": errors}), 422
-# 
-#     # Example processing: return the validated data
-#     return jsonify({
-#         "message": "Images uploaded successfully",
-#         "uploaded_images": images,
-#     }), 200
-
-    
-
-@api_bp.route('/api/upload_image', methods=['POST'])
-def upload_image():
-    """
-    Flask API endpoint to upload an image, store metadata, and retrieve similar images.
-
-    Expects a JSON payload:
-    {
-        "image_path": "path/to/image.jpg",
-        "account_name": "account_name",
-        "account_source": "account_source",
-        "chat_session_id": "session_id"
-    }
-    """
-    try:
-        # Parse the incoming JSON data
-        if not request.is_json:
-            return jsonify({"error": "Invalid input. Expected JSON format."}), 400
-
-        data = request.get_json()
-
-        # Validate required fields
-        required_fields = ["image_path", "account_name", "account_source",  "chat_session_id"]
-        for field in required_fields:
-            if field not in data:
-                return jsonify({"error": f"Missing required field: {field}"}), 400
-
-        image_path = data["image_path"]
-        account_name = data["account_name"]
-        account_source = data["account_source"]
-        chat_session_id = data["chat_session_id"]
-
-        db_session = current_app.extensions["sqlalchemy"].session
-
-        # Step 1: Extract accurate geo information from EXIF data
-        image_metadata = extract_image_metadata(image_path)
-        if image_metadata:
-            if image_metadata.get("WKT Point"):
-                accurate_geo_exif = image_metadata["WKT Point"]
-    
-        #image_embedding = get_embedding(image_path, mode="image")
-        image_embedding = load_embedding_from_file('./test_embedding.txt')
-
-        #sample_text = "This is a sample text for testing."
-        #text_embedding = get_embedding(image_path, mode="text")
-
-        # Step 2: Store the image and its metadata into the database
-        image_data_to_db( db_session=db_session, image_path=image_path,
-            image_metadata=image_metadata, image_embedding=image_embedding, account_name=account_name, 
-            account_source=account_source, session_id=chat_session_id) 
-        print('Image data stored in the database')
-    
-    except Exception as e:
-        print(e)
-        raise e
-
-
-@api_bp.route('/process_chat', methods=['POST'])
-def process_chat():
-    """
-    Process chat content, find associated location and embeddings, and return similar images.
-    """
-    try:
-        # Parse input arguments
-        data = request.json
-        account_id = data.get("account_id")
-        content = data.get("content")
-        session_id = data.get("session_id")
-        back_hours = data.get("back_hours", 0)  # Default 0 hour means all chat history
-
-        db_session = current_app.extensions["sqlalchemy"].session
-
-        # Validate input
-        if not account_id or not content or not session_id:
-            return jsonify({"error": "Missing required parameters: account_id, content, session_id"}), 400
-
-        # Step 1: Find previous chat history (memory)
-        chat_histories = get_chat_histories_from_db(db_session, session_id, account_id, back_hours)
-
-        # Step 2: Check if the last chat history has been replied 
-        
-        
-        # Step 2: Check if any chat history has location info
-        found_location = None
-        for chat in chat_histories:
-            if chat.location:
-                found_location = chat.location
-                break
-
-        # # Step 3: Store new chat history
-        # new_chat_history = ChatHistory(
-        #     session_id=session_id,
-        #     account_id=account_id,
-        #     content=content,
-        #     time=datetime.utcnow(),
-        #     location=found_location  # Placeholder for location
-        # )
-        # db.session.add(new_chat_history)
-        # db.session.flush()  # Ensure the record gets an ID
-
-        # # Step 4: If no location found, call LLM to extract location
-        # if not found_location:
-        #     location_info = extract_location_info(content)  # Replace with your LangChain/OpenAI implementation
-        #     if location_info:
-        #         found_location = convert_to_wkt(location_info)
-        #         new_chat_history.location = found_location
-        #     else:
-        #         return jsonify({"error": "Unable to determine location from previous chat history or content."}), 400
-
-        # # Step 5: Use the location to find similar images
-        # embedding = [0.1, 0.2, 0.3, 0.4]  # Placeholder: Replace with embedding generation function
-        # similar_images = search_images(location_wkt=found_location, embedding=embedding, radius=1000, threshold=0.5, limit=10)
-
-        # # Commit the new chat history record to the database
-        # db.session.commit()
-
-        # # Step 6: Return similar images
-        # return jsonify({"images": similar_images}), 200
-        return None
-
-    except Exception as e:
-        return None
-        # db_session.rollback()  # Roll back any uncommitted transactions
-        # return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-    
 
 def find_last_image_url_chat(messages):
     """
@@ -245,10 +79,73 @@ def get_location_from_db(db_session, chat_session, account, back_hours=1):
         return {}
 
 
+from flask import request, jsonify, current_app
+from jsonschema import validate, ValidationError
+from datetime import datetime
+import os
+import json
+
+@api_bp.route('/upload_images', methods=['POST'])
+def upload_images():
+    db_session = current_app.extensions["sqlalchemy"].session
+
+    try:
+        # header 
+        header = get_header_info(request)
+
+        # Parse and validate JSON data
+        data = request.get_json()
+        validate(instance=data, schema=ImageUploadJsonSchema)
+
+        account_info = data.get("user")  
+        account_name = account_info.get("user")
+        current_time = datetime.now(TZ)  
+
+        processed_images = []
+
+        account_item = account_to_db(db_session, account_name, header)
+
+        for image in data['images']:
+            image_type = image.get('type')
+            image_url = image.get('image_url', {}).get('url')
+            image_detail = image.get('image_url', {}).get('detail')
+            location = image.get('location')
+
+            if not image_url or not image_type:
+                continue  # Skip images without required URL or type
+
+            if os.path.isfile(image_url):
+                base64_str_no_header = image_to_base64(image_url)
+                image_md5 = get_md5_of_image(base64_str_no_header)
+                image_data = base64_to_image(base64_str_no_header)
+                image_metadata = extract_image_metadata(image_data)
+
+                #image_embedding = get_embedding(image_data, mode="image")
+                image_embedding = load_embedding_from_file('./test_embedding.txt')
+
+                image_item = image_to_db(db_session, image_url, image_metadata, image_md5, image_embedding, account_item.id, None)
+
+                # Update location from JSON if metadata does not have it
+                if location and not image_metadata.get("WKT Point"):
+                    image_item.location = f"POINT({location['longitude']} {location['latitude']})"
+
+                processed_images.append(image_item)
+
+        db_session.commit()
+        return jsonify({"message": "Images processed successfully", "processed_images": len(processed_images)}), 200
+
+    except ValidationError as e:
+        db_session.rollback()
+        return jsonify({"error": "Invalid data", "details": str(e)}), 400
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500
+
 
 
 @api_bp.route('/process_chat_json', methods=['POST'])
 def handle_json():
+
     try:
         # header 
         header = get_header_info(request)
@@ -305,7 +202,9 @@ def handle_json():
             #image_embedding = get_embedding(image_data, mode="image")
             image_embedding = load_embedding_from_file('./test_embedding.txt')
 
-            image_item = image_to_db(db_session, image_url, image_metadata, image_md5, image_embedding, account_item, device_item)
+            account_id = account_item.id if account_item else None
+            device_id = device_item.id if account_item else None
+            image_item = image_to_db(db_session, image_url, image_metadata, image_md5, image_embedding, account_id, device_id)
 
 
             if image_metadata:
@@ -331,6 +230,10 @@ def handle_json():
         #text_embedding = get_embedding(image_path, mode="text")
 
         print('Image data stored in the database')
+
+        # TODO: 
+        #   1. To implement the functions to associate transcripts to existing image data
+        #   2. To implement the algorithm to do similarity search in image database, and to return the associated transcript
 
         # If validation passes
         return jsonify({"message": "JSON data is valid"}), 200

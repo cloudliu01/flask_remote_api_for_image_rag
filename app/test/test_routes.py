@@ -1,5 +1,6 @@
 import pytest
 import os
+import json
 from unittest.mock import patch, MagicMock
 
 from app.utilities.image import image_to_base64
@@ -226,3 +227,55 @@ def test_valid_json_with_image_2(client):
     response = client.post('/process_chat_json', json=data)
     assert response.status_code == 200
     assert response.json['message'] == 'JSON data is valid'
+
+    
+import pytest
+import os
+from werkzeug.datastructures import FileStorage
+from flask import Flask, request, jsonify
+
+# Assuming Flask setup is correct and able to handle mixed data and file uploads
+
+
+def test_upload_images(client):
+    base_dir = os.path.dirname(__file__)
+    images_dir = os.path.join(base_dir, "images")
+    image_files = [os.path.join(images_dir, f) for f in os.listdir(images_dir) if f.endswith('.JPG')]
+
+    # Prepare JSON data and files according to the schema
+    images_data = []
+    for file in image_files:
+        # Assume we simulate EXIF extraction to include type and location metadata
+        images_data.append({
+            'type': 'image/jpeg',
+            'text': 'Sample image',
+            'image_url': {
+                'url': file,
+                'detail': 'High detail'
+            },
+            'location': {
+                'longitude': 0,
+                'latitude': 0
+            }
+        })
+
+    # Build the payload
+    data = {
+        'user': {
+            'user': 'user123'
+        },
+        'images': images_data
+    }
+
+    # Convert data to JSON and add it to the request along with files
+    response = client.post(
+        '/upload_images',
+        json=data
+    )
+
+    assert response.status_code == 200
+    response_data = response.get_json()
+    assert 'Images uploaded successfully' in response_data['message']
+    assert len(response_data['processed_images']) == len(image_files)  # Ensure all images are processed
+
+# Note: Adjust the actual Flask route handling logic to properly parse this mixed data format.

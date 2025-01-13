@@ -90,3 +90,46 @@ ChatJsonSchema = {
     },
     "required": ["model", "user", "session", "stream", "messages", "max_tokens"]
 }
+
+
+ImageUploadJsonSchema = {
+    "type": "object",
+    "properties": {
+        "user": {  
+            "type": "object",
+            "properties": {
+                "user": {"type": "string"},
+            },
+            "required": ["user"],  
+            "additionalProperties": False
+        },
+        "images": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "type": {"type": "string"},
+                    "text": {"type": "string"},
+                    "image_url": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string"},
+                            "detail": {"type": "string"}
+                        },
+                        "required": ["url", "detail"]
+                    },
+                    "location": {
+                        "type": "object",
+                        "properties": {
+                            "longitude": {"type": "number"},
+                            "latitude": {"type": "number"}
+                        },
+                        "required": ["longitude", "latitude"]
+                    }
+                },
+                "required": ["type"]
+            }
+        }
+    },
+    "required": ["images"]
+}
