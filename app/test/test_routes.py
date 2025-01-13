@@ -187,7 +187,8 @@ def test_valid_json_with_image_1(client):
 
 def test_valid_json_with_image_2(client):
     """ Test the route with valid JSON including base64 image data. The image doesn't have exif data """
-    image_path = get_test_image_path("IMG_1181.JPG")  
+    #image_path = get_test_image_path("IMG_1181.JPG")  
+    image_path = get_test_image_path("IMG_0475.JPG")  
     image_base64 = image_to_base64(image_path, keep_exif=False)
     data = {
         "model": "gpt-4o-mini",
@@ -216,8 +217,8 @@ def test_valid_json_with_image_2(client):
                 "content": {
                     "type": "location",
                     "location": {
-                        "longitude":    -73.985428, 
-                        "latitude":     40.748817
+                        "longitude":    -1.706313888888889,
+                        "latitude":     52.19267222222222
                     }
                 }
             } 
@@ -240,7 +241,7 @@ from flask import Flask, request, jsonify
 def test_upload_images(client):
     base_dir = os.path.dirname(__file__)
     images_dir = os.path.join(base_dir, "images")
-    image_files = [os.path.join(images_dir, f) for f in os.listdir(images_dir) if f.endswith('.JPG')]
+    image_files = [os.path.join(images_dir, f) for f in os.listdir(images_dir) if f.endswith('.JPG') and f != 'IMG_1181.JPG'] # 1181 is used for retrieving location
 
     # Prepare JSON data and files according to the schema
     images_data = []

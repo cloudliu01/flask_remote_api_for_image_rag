@@ -1,8 +1,7 @@
 from sqlalchemy.orm import Session
 from contextlib import contextmanager
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_, or_
-from sqlalchemy import select, and_
+from sqlalchemy import func, select, and_, or_
 from sqlalchemy.orm import aliased, joinedload
 from datetime import datetime, timedelta
 from geoalchemy2.functions import ST_DWithin, ST_GeogFromText
@@ -254,28 +253,26 @@ def find_images_by_similarity(db_session: Session, image_ids: list, embedding: l
         if not isinstance(embedding, list) or not embedding:
             raise ValueError("Embedding must be a non-empty list.")
 
-        return (
-            db_session.query(
-                Image.id,
-                Image.path,
-                Image.location,
-                Image.other_metadata,
-                func.cosine_similarity(Embedding.image_embedding, ARRAY(embedding)).label("similarity")
-            )
-            .join(Embedding, Embedding.image_id == Image.id)
-            .filter(
-                Image.id.in_(image_ids),  # Filter by image IDs
-                func.cosine_similarity(Embedding.image_embedding, ARRAY(embedding)) >= threshold  # Cosine similarity filter
-            )
-            .order_by(func.cosine_similarity(Embedding.image_embedding, ARRAY(embedding)).desc())  # Order by similarity
-            .limit(limit)
-            .all()
-        )
+        query = select(
+                Embedding.id.label("embedding_id"),
+                Embedding.image_embedding.cosine_distance(embedding).label("cosine_distance"),
+                Image.id.label("image_id"),
+                Image.path.label("image_path"),
+                Image.location.label("image_location"),
+                Image.other_metadata.label("image_other_metadata")
+                ).select_from(Embedding).\
+                    join(Image, Embedding.image_id == Image.id).\
+                    filter(Embedding.image_embedding.cosine_distance(embedding) < threshold).\
+                    order_by(Embedding.image_embedding.cosine_distance(embedding).asc()).\
+                    limit(limit)
+
+        return db_session.execute(query).fetchall()
+
     except Exception as e:
         raise ValueError(f"Error performing cosine similarity search: {e}")
 
 
-def search_images(location_wkt: str, embedding: list, radius: float = 1000, threshold: float = 0.5, limit: int = 10) -> list:
+def search_images(db_session: Session, location_wkt: str, embedding: list, radius: float = 1000, threshold: float = 0.5, limit: int = 10) -> list:
     """
     Combines location-based and cosine similarity searches to find relevant images.
 
@@ -288,7 +285,7 @@ def search_images(location_wkt: str, embedding: list, radius: float = 1000, thre
     """
     try:
         # Step 1: Find images by location
-        location_results = find_images_by_location(location_wkt, radius)
+        location_results = find_images_by_location(db_session, location_wkt, radius)
         if not location_results:
             return []
 
@@ -296,16 +293,17 @@ def search_images(location_wkt: str, embedding: list, radius: float = 1000, thre
         image_ids = [image.id for image in location_results]
 
         # Step 2: Find images by cosine similarity within the location results
-        similarity_results = find_images_by_similarity(image_ids, embedding, threshold, limit)
+        similarity_results = find_images_by_similarity(db_session, image_ids, embedding, threshold, limit)
 
         # Step 3: Format and return the results
         return [
             {
-                "id": result.id,
-                "path": result.path,
-                "location": result.location,
-                "metadata": result.other_metadata,
-                "similarity": result.similarity
+                "embedding_id": result.embedding_id,
+                "cosine_distance": result.cosine_distance,
+                "image_id": result.image_id,
+                "image_path": result.image_path,
+                "image_location": result.image_location,
+                "image_other_metadata": result.image_other_metadata
             }
             for result in similarity_results
         ]

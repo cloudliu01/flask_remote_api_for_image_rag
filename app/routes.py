@@ -79,12 +79,6 @@ def get_location_from_db(db_session, chat_session, account, back_hours=1):
         return {}
 
 
-from flask import request, jsonify, current_app
-from jsonschema import validate, ValidationError
-from datetime import datetime
-import os
-import json
-
 @api_bp.route('/upload_images', methods=['POST'])
 def upload_images():
     db_session = current_app.extensions["sqlalchemy"].session
@@ -120,8 +114,8 @@ def upload_images():
                 image_data = base64_to_image(base64_str_no_header)
                 image_metadata = extract_image_metadata(image_data)
 
-                #image_embedding = get_embedding(image_data, mode="image")
-                image_embedding = load_embedding_from_file('./test_embedding.txt')
+                image_embedding = get_embedding(image_data, mode="image")
+                #image_embedding = load_embedding_from_file('./test_embedding.txt')
 
                 image_item = image_to_db(db_session, image_url, image_metadata, image_md5, image_embedding, account_item.id, None)
 
@@ -199,11 +193,11 @@ def handle_json():
             image_data = base64_to_image(base64_str_no_header)
             image_metadata = extract_image_metadata(image_data)
 
-            #image_embedding = get_embedding(image_data, mode="image")
-            image_embedding = load_embedding_from_file('./test_embedding.txt')
+            image_embedding = get_embedding(image_data, mode="image")
+            #image_embedding = load_embedding_from_file('./test_embedding.txt')
 
             account_id = account_item.id if account_item else None
-            device_id = device_item.id if account_item else None
+            device_id = device_item.id if device_item else None
             image_item = image_to_db(db_session, image_url, image_metadata, image_md5, image_embedding, account_id, device_id)
 
 
@@ -234,6 +228,7 @@ def handle_json():
         # TODO: 
         #   1. To implement the functions to associate transcripts to existing image data
         #   2. To implement the algorithm to do similarity search in image database, and to return the associated transcript
+        images = search_images(db_session=db_session, location_wkt=location, embedding=image_embedding, radius= 1000, threshold=0.5, limit=3)
 
         # If validation passes
         return jsonify({"message": "JSON data is valid"}), 200
