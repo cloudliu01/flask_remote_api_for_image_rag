@@ -227,9 +227,12 @@ def handle_json():
 
         # TODO: 
         #   1. To implement the functions to associate transcripts to existing image data
-        #   2. To implement the algorithm to do similarity search in image database, and to return the associated transcript
+        #   2. To return transcript or mp3 
+        #   3. if none similar image found, return a instruction to Libre to query GPT instead
         images = search_images(db_session=db_session, location_wkt=location, embedding=image_embedding, radius= 1000, threshold=0.5, limit=3)
 
+        if images[0] == 'IMG_1181.JPG':
+            return 'aaaa'
         # If validation passes
         return jsonify({"message": "JSON data is valid"}), 200
     except ValidationError as e:
